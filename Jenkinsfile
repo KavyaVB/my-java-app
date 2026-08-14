@@ -4,7 +4,7 @@ pipeline {
 
     environment {
         AWS_REGION = 'us-east-1'
-        ECR_REPO_NAME = 'myrepo'
+        ECR_REPO_NAME = 'my-nginx'
         ECR_PUBLIC_REPO_URI = 'public.ecr.aws/g1c4x6s2/my-nginx'
         IMAGE_NAME = 'my-java-app'
         IMAGE_TAG = "${BUILD_NUMBER}"
