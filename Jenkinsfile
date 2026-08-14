@@ -65,7 +65,7 @@ pipeline {
             steps {
                 sh '''
                     docker push \
-                    ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+                    ${ECR_REGISTRY}:${IMAGE_TAG}
                 '''
             }
         }
