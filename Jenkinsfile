@@ -40,16 +40,6 @@ pipeline {
             }
         }
 
-        stage('Tag images'){
-            steps {
-                sh'''
-                docker tag\
-                ${IMAGE_NAME}:${IMAGE_TAG} \
-                ${ECR_REGISTRY}:${IMAGE_TAG}
-                '''
-            }
-        }
-
         stage('Login to ECR Public') {
             steps {
                 sh '''
