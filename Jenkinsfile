@@ -8,7 +8,7 @@ pipeline {
         ECR_REGISTRY = 'public.ecr.aws/my-nginx'
         ECR_PUBLIC_REPO_URI = 'public.ecr.aws/g1c4x6s2/my-nginx'
         IMAGE_NAME = 'my-java-app'
-        IMAGE_TAG = '${BUILD_NUMBER}'
+        IMAGE_TAG = "${BUILD_NUMBER}"
     }
 
     stages {
