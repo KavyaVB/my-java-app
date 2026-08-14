@@ -52,11 +52,20 @@ pipeline {
             }
         }
 
+        stage('Tag image'){
+            steps {
+                sh '''
+                docker tag ${IMAGE_NAME}:${IMAGE_TAG} \
+                ${ECR_REGISTRY}:${IMAGE_TAG}
+                '''
+            }
+        }
+
         stage('Push Image') {
             steps {
                 sh '''
                     docker push \
-                    ${ECR_REGISTRY}/${ECR_REPO_NAME}:${IMAGE_TAG}
+                    ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
                 '''
             }
         }
