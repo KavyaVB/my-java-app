@@ -36,7 +36,7 @@ pipeline {
             steps {
                 sh '''
                     docker build \
-                      -t ${IMAGE_NAME}:${IMAGE_TAG} .
+                      -t ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} .
                 '''
             }
         }
