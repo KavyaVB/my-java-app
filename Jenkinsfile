@@ -5,7 +5,7 @@ pipeline {
     environment {
         AWS_REGION = 'us-east-1'
         ECR_REPO_NAME = 'my-java-app'
-        ECR_REGISTRY = 'public.ecr.aws/g1c4x6s2/java-image'
+        ECR_REGISTRY = 'public.ecr.aws/g1c4x6s2/my-java-app'
         IMAGE_NAME = 'java-image'
         IMAGE_TAG = "${BUILD_NUMBER}"
     }
@@ -35,7 +35,7 @@ pipeline {
             steps {
                 sh '''
                     docker build \
-                      -t ${ECR_REGISTRY}:${IMAGE_TAG} .
+                      -t ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} .
                 '''
             }
         }
