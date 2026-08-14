@@ -45,7 +45,7 @@ pipeline {
                 sh'''
                 docker tag\
                 ${IMAGE_NAME}:${IMAGE_TAG}\
-                ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGES_TAG}
+                ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
                 '''
             }
         }
