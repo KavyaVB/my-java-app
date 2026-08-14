@@ -74,7 +74,7 @@ pipeline {
             steps {
                 withCredentials([
                     file(
-                        credentialsId: 'kubeconfig',
+                        credentialsId: 'kubernetes_credentials',
                         variable: 'KUBECONFIG'
                     )
                 ]) {
