@@ -7,7 +7,7 @@ pipeline {
         ECR_REPO_NAME = 'my-java-app'
         ECR_REGISTRY = 'public.ecr.aws/g1c4x6s2'
         IMAGE_NAME = 'java-image'
-        IMAGE_TAG = "${BUILD_NUMBER}"
+        IMAGE_TAG = 'latest'
     }
 
     stages {
