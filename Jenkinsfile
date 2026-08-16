@@ -3,11 +3,9 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION = 'us-east-1'
+        AWS_REGION   = 'us-east-1'
         ECR_REPO_NAME = 'my-java-app'
         ECR_REGISTRY = 'public.ecr.aws/g1c4x6s2'
-        IMAGE_NAME = 'java-image'
-        IMAGE_TAG = 'latest'
     }
 
     stages {
@@ -21,13 +19,32 @@ pipeline {
 
         stage('Build Java') {
             steps {
-                sh 'mvn clean package'
+                sh '''
+                    mvn clean package
+                '''
+            }
+        }
+
+        stage('Verify JAR') {
+            steps {
+                sh '''
+                    echo "Checking JAR contents..."
+                    jar tf target/my-java-app-1.0.jar | grep 'com/example/App.class'
+
+                    echo "Checking MANIFEST..."
+                    unzip -p target/my-java-app-1.0.jar META-INF/MANIFEST.MF
+
+                    echo "Testing application..."
+                    timeout 10 java -jar target/my-java-app-1.0.jar || true
+                '''
             }
         }
 
         stage('Test') {
             steps {
-                sh 'mvn test'
+                sh '''
+                    mvn test
+                '''
             }
         }
 
@@ -35,7 +52,7 @@ pipeline {
             steps {
                 sh '''
                     docker build \
-                      -t ${IMAGE_NAME}:${IMAGE_TAG} .
+                      -t ${ECR_REPO_NAME}:${BUILD_NUMBER} .
                 '''
             }
         }
@@ -44,19 +61,20 @@ pipeline {
             steps {
                 sh '''
                     aws ecr-public get-login-password \
-                    --region ${AWS_REGION} | \
+                      --region ${AWS_REGION} | \
                     docker login \
-                    --username AWS \
-                    --password-stdin public.ecr.aws
+                      --username AWS \
+                      --password-stdin ${ECR_REGISTRY}
                 '''
             }
         }
 
-        stage('Tag image') {
+        stage('Tag Image') {
             steps {
                 sh '''
-                docker tag ${IMAGE_NAME}:${IMAGE_TAG} \
-                ${ECR_REGISTRY}/${ECR_REPO_NAME}:${IMAGE_TAG}
+                    docker tag \
+                      ${ECR_REPO_NAME}:${BUILD_NUMBER} \
+                      ${ECR_REGISTRY}/${ECR_REPO_NAME}:${BUILD_NUMBER}
                 '''
             }
         }
@@ -65,7 +83,7 @@ pipeline {
             steps {
                 sh '''
                     docker push \
-                    ${ECR_REGISTRY}/${ECR_REPO_NAME}:${IMAGE_TAG}
+                      ${ECR_REGISTRY}/${ECR_REPO_NAME}:${BUILD_NUMBER}
                 '''
             }
         }
@@ -80,23 +98,25 @@ pipeline {
                 ]) {
 
                     sh '''
-                        export KUBECONFIG=$KUBECONFIG
+                        export KUBECONFIG="$KUBECONFIG"
 
-                        sed -i \
-                        "s|IMAGE_PLACEHOLDER|${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}|g" \
-                        k8s/deployment.yaml
+                        echo "Deploying image:"
+                        echo "${ECR_REGISTRY}/${ECR_REPO_NAME}:${BUILD_NUMBER}"
 
-                        kubectl apply -f k8s/deployment.yaml
+                        kubectl set image deployment/my-java-app \
+                          my-java-app=${ECR_REGISTRY}/${ECR_REPO_NAME}:${BUILD_NUMBER}
+
                         kubectl apply -f k8s/service.yaml
 
                         kubectl rollout status \
-                        deployment/my-java-app
+                          deployment/my-java-app \
+                          --timeout=5m
                     '''
                 }
             }
         }
 
-        stage('Verify') {
+        stage('Verify Deployment') {
             steps {
                 withCredentials([
                     file(
@@ -106,12 +126,17 @@ pipeline {
                 ]) {
 
                     sh '''
-                        kubectl get pods
-                        kubectl get svc
-                        kubectl get deployment
-                    '''
-                }
-            }
-        }
-    }
-}
+                        export KUBECONFIG="$KUBECONFIG"
+
+                        echo "===== Deployment ====="
+                        kubectl get deployment my-java-app
+
+                        echo "===== Pods ====="
+                        kubectl get pods -o wide
+
+                        echo "===== Service ====="
+                        kubectl get svc my-java-app-service
+
+                        echo "===== Image ====="
+                        kubectl get deployment my-java-app \
+                          -o jsonpath='{.spec
