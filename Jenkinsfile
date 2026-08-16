@@ -139,4 +139,23 @@ pipeline {
 
                         echo "===== Image ====="
                         kubectl get deployment my-java-app \
-                          -o jsonpath='{.spec
+                          -o jsonpath='{.spec.template.spec.containers[0].image}'
+                        echo
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Build ${BUILD_NUMBER} completed successfully."
+            echo "Image: ${ECR_REGISTRY}/${ECR_REPO_NAME}:${BUILD_NUMBER}"
+        }
+
+        failure {
+            echo "Build ${BUILD_NUMBER} failed."
+            echo "Check the failed stage and Jenkins console output."
+        }
+    }
+}
