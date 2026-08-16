@@ -4,9 +4,10 @@ pipeline {
 
     environment {
         AWS_REGION = 'us-east-1'
-        ECR_REGISTRY = 'public.ecr.aws/g1c4x6s2/myrepo'
-        IMAGE_NAME = 'my-java-app'
-        IMAGE_TAG = "${BUILD_NUMBER}"
+        ECR_REPO_NAME = 'my-java-app'
+        ECR_REGISTRY = 'public.ecr.aws/g1c4x6s2'
+        IMAGE_NAME = 'java-image'
+        IMAGE_TAG = 'latest'
     }
 
     stages {
@@ -34,7 +35,7 @@ pipeline {
             steps {
                 sh '''
                     docker build \
-                      -t ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} .
+                      -t ${IMAGE_NAME}:${IMAGE_TAG} .
                 '''
             }
         }
@@ -51,11 +52,20 @@ pipeline {
             }
         }
 
+        stage('Tag image') {
+            steps {
+                sh '''
+                docker tag ${IMAGE_NAME}:${IMAGE_TAG} \
+                ${ECR_REGISTRY}/${ECR_REPO_NAME}:${IMAGE_TAG}
+                '''
+            }
+        }
+
         stage('Push Image') {
             steps {
                 sh '''
                     docker push \
-                    ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+                    ${ECR_REGISTRY}/${ECR_REPO_NAME}:${IMAGE_TAG}
                 '''
             }
         }
@@ -64,7 +74,7 @@ pipeline {
             steps {
                 withCredentials([
                     file(
-                        credentialsId: 'kubeconfig',
+                        credentialsId: 'kubernetes_credentials',
                         variable: 'KUBECONFIG'
                     )
                 ]) {
