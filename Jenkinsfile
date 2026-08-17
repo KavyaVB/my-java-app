@@ -136,7 +136,7 @@ pipeline {
                         kubectl get pods -o wide
 
                         echo "===== Service ====="
-                        kubectl get svc my-java-app-service
+                        kubectl get svc my-java-app
 
                         echo "===== Image ====="
                         kubectl get deployment my-java-app \
