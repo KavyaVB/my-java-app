@@ -99,15 +99,16 @@ pipeline {
 
                     sh '''
                         export KUBECONFIG="$KUBECONFIG"
-
+                    
                         echo "Deploying image:"
                         echo "${ECR_REGISTRY}/${ECR_REPO_NAME}:${BUILD_NUMBER}"
-
-                        kubectl set image deployment/my-java-app \
-                          my-java-app=${ECR_REGISTRY}/${ECR_REPO_NAME}:${BUILD_NUMBER}
-
-                        kubectl apply -f k8s/service.yaml
-
+                    
+                        helm upgrade --install my-java-app ./helm/my-java-app \
+                          --set image.repository="${ECR_REGISTRY}/${ECR_REPO_NAME}" \
+                          --set image.tag="${BUILD_NUMBER}"
+                    
+                        helm status my-java-app
+                    
                         kubectl rollout status \
                           deployment/my-java-app \
                           --timeout=5m
