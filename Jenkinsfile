@@ -7,10 +7,8 @@ pipeline {
         ECR_REPO_NAME = 'my-java-app'
         ECR_REGISTRY  = 'public.ecr.aws/g1c4x6s2'
 
-        HELM_CHART = './helm/my-java-app'
-
-        SERVICE_RELEASE = 'my-java-app-service'
-        SERVICE_NAME    = 'my-java-app-service'
+        HELM_CHART    = './helm/my-java-app'
+        HELM_RELEASE  = 'my-java-app'
     }
 
     stages {
@@ -98,122 +96,7 @@ pipeline {
             }
         }
 
-        /*
-         * ---------------------------------------------------------
-         * Find which color is currently receiving production traffic
-         * ---------------------------------------------------------
-         */
-
-        stage('Detect Active Color') {
-
-            steps {
-
-                withCredentials([
-                    file(
-                        credentialsId: 'kubernetes_credentials',
-                        variable: 'KUBECONFIG'
-                    )
-                ]) {
-
-                    script {
-
-                        def activeColor = sh(
-                            script: '''
-                                export KUBECONFIG="$KUBECONFIG"
-
-                                kubectl get service ${SERVICE_NAME} \
-                                  -o jsonpath='{.spec.selector.version}' \
-                                  2>/dev/null || true
-                            ''',
-                            returnStdout: true
-                        ).trim()
-
-                        /*
-                         * First deployment.
-                         */
-                        if (!activeColor) {
-
-                            activeColor = "blue"
-
-                            echo "Production Service does not exist."
-                            echo "First deployment will use BLUE."
-                        }
-
-                        def newColor
-
-                        if (activeColor == "blue") {
-                            newColor = "green"
-                        } else {
-                            newColor = "blue"
-                        }
-
-                        env.ACTIVE_COLOR = activeColor
-                        env.NEW_COLOR = newColor
-
-                        echo "======================================"
-                        echo "Active color : ${env.ACTIVE_COLOR}"
-                        echo "New color    : ${env.NEW_COLOR}"
-                        echo "======================================"
-                    }
-                }
-            }
-        }
-
-        /*
-         * ---------------------------------------------------------
-         * Make sure production Service exists.
-         * This is a SEPARATE Helm release.
-         * ---------------------------------------------------------
-         */
-
-        stage('Ensure Production Service') {
-
-            steps {
-
-                withCredentials([
-                    file(
-                        credentialsId: 'kubernetes_credentials',
-                        variable: 'KUBECONFIG'
-                    )
-                ]) {
-
-                    sh '''
-                        export KUBECONFIG="$KUBECONFIG"
-
-                        echo "Checking production Service..."
-
-                        if kubectl get service ${SERVICE_NAME} >/dev/null 2>&1
-                        then
-                            echo "Production Service already exists."
-
-                        else
-
-                            echo "Creating production Service..."
-
-                            helm upgrade --install \
-                                "${HELM_RELEASE}" \
-                                "${HELM_CHART}" \
-                                --set color="${ACTIVE_COLOR}" \
-                                --set productionService.enabled=true \
-                                --set productionService.color="${ACTIVE_COLOR}" \
-                                --wait \
-                                --timeout 5m
-                            echo "Production Service created."
-                        fi
-
-                        kubectl get service ${SERVICE_NAME}
-                    '''
-                }
-            }
-        }
-
-        /*
-         * ---------------------------------------------------------
-         * Deploy GREEN or BLUE without creating a Service
-         * ---------------------------------------------------------
-         */
-
-        stage('Deploy Inactive Color') {
+        stage('Helm Upgrade') {
 
             steps {
 
@@ -228,38 +111,40 @@ pipeline {
                         export KUBECONFIG="$KUBECONFIG"
 
                         echo "======================================"
-                        echo "Deploying ${NEW_COLOR}"
-                        echo "Image:"
-                        echo "${ECR_REGISTRY}/${ECR_REPO_NAME}:${BUILD_NUMBER}"
+                        echo "Checking Helm"
+                        echo "======================================"
+
+                        helm version
+
+                        echo "======================================"
+                        echo "Helm Lint"
+                        echo "======================================"
+
+                        helm lint ${HELM_CHART}
+
+                        echo "======================================"
+                        echo "Upgrading Application"
                         echo "======================================"
 
                         helm upgrade --install \
-                          my-java-app-${NEW_COLOR} \
+                          ${HELM_RELEASE} \
                           ${HELM_CHART} \
-                          --set color=${NEW_COLOR} \
                           --set image.repository="${ECR_REGISTRY}/${ECR_REPO_NAME}" \
                           --set image.tag="${BUILD_NUMBER}" \
-                          --set productionService.enabled=false \
                           --wait \
                           --timeout 5m
 
                         echo "======================================"
-                        echo "${NEW_COLOR} deployment completed"
+                        echo "Helm Upgrade Completed"
                         echo "======================================"
 
-                        helm status my-java-app-${NEW_COLOR}
+                        helm status ${HELM_RELEASE}
                     '''
                 }
             }
         }
 
-        /*
-         * ---------------------------------------------------------
-         * Verify new Deployment
-         * ---------------------------------------------------------
-         */
-
-        stage('Verify New Deployment') {
+        stage('Verify Rolling Update') {
 
             steps {
 
@@ -274,198 +159,74 @@ pipeline {
                         export KUBECONFIG="$KUBECONFIG"
 
                         echo "======================================"
-                        echo "Checking ${NEW_COLOR} deployment"
+                        echo "ROLLING UPDATE STATUS"
                         echo "======================================"
-
-                        DEPLOYMENT_NAME=$(kubectl get deployment \
-                            -l app.kubernetes.io/name=my-java-app,version="${NEW_COLOR}" \
-                            -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
-                        
-                        if [ -z "$DEPLOYMENT_NAME" ]; then
-                            echo "ERROR: No ${NEW_COLOR} deployment found"
-                            kubectl get deployments --show-labels
-                            exit 1
-                        fi
-                        
-                        echo "Found deployment: ${DEPLOYMENT_NAME}"
 
                         kubectl rollout status \
-                            deployment/"${DEPLOYMENT_NAME}" \
-                            --timeout=5m
-
-                        echo "===== Deployment ====="
-
-                        kubectl get deployment "${DEPLOYMENT_NAME}" -o wide
-
-                        echo "${NEW_COLOR} deployment verification completed"
-                        echo "======================================"
-
-
-                        echo "===== Pods ====="
-
-                        kubectl get pods \
-                          -l app=my-java-app,version=${NEW_COLOR} \
-                          -o wide
-
-                        echo "===== Waiting for Pods ====="
-
-                        kubectl wait \
-                          --for=condition=ready \
-                          pod \
-                          -l app=my-java-app,version=${NEW_COLOR} \
+                          deployment/my-java-app \
                           --timeout=5m
-                    '''
-                }
-            }
-        }
-
-        /*
-         * ---------------------------------------------------------
-         * Switch production traffic
-         * ---------------------------------------------------------
-         */
-
-        stage('Switch Traffic') {
-
-            steps {
-
-                withCredentials([
-                    file(
-                        credentialsId: 'kubernetes_credentials',
-                        variable: 'KUBECONFIG'
-                    )
-                ]) {
-
-                    sh '''
-                        export KUBECONFIG="$KUBECONFIG"
 
                         echo "======================================"
-                        echo "SWITCHING TRAFFIC"
-                        echo "FROM: ${ACTIVE_COLOR}"
-                        echo "TO  : ${NEW_COLOR}"
+                        echo "Deployment"
                         echo "======================================"
 
-                        helm upgrade ${SERVICE_RELEASE} \
-                          ${HELM_CHART} \
-                          --set productionService.enabled=true \
-                          --set productionService.color=${NEW_COLOR} \
-                          --wait \
-                          --timeout 5m
-
-                        echo "Traffic switched to ${NEW_COLOR}."
-                    '''
-                }
-            }
-        }
-
-        /*
-         * ---------------------------------------------------------
-         * Verify Service after traffic switch
-         * ---------------------------------------------------------
-         */
-
-        stage('Verify Service') {
-
-            steps {
-
-                withCredentials([
-                    file(
-                        credentialsId: 'kubernetes_credentials',
-                        variable: 'KUBECONFIG'
-                    )
-                ]) {
-
-                    sh '''
-                        export KUBECONFIG="$KUBECONFIG"
+                        kubectl get deployment my-java-app -o wide
 
                         echo "======================================"
-                        echo "VERIFYING PRODUCTION SERVICE"
+                        echo "Pods"
                         echo "======================================"
-
-                        echo "===== Service Selector ====="
-
-                        kubectl get service ${SERVICE_NAME} \
-                          -o jsonpath='{.spec.selector}'
-                        echo
-
-                        echo "===== Waiting for Endpoints ====="
-
-                        for i in {1..30}
-                        do
-
-                            ENDPOINTS=$(kubectl get endpoints ${SERVICE_NAME} \
-                              -o jsonpath='{.subsets[*].addresses[*].ip}' \
-                              2>/dev/null || true)
-
-                            if [ -n "$ENDPOINTS" ]
-                            then
-
-                                echo "Service endpoints found:"
-                                echo "$ENDPOINTS"
-
-                                exit 0
-                            fi
-
-                            echo "Waiting for service endpoints..."
-                            sleep 5
-
-                        done
-
-                        echo "ERROR: No service endpoints found."
-
-                        exit 1
-                    '''
-                }
-            }
-        }
-
-        /*
-         * ---------------------------------------------------------
-         * Final verification
-         * ---------------------------------------------------------
-         */
-
-        stage('Final Verification') {
-
-            steps {
-
-                withCredentials([
-                    file(
-                        credentialsId: 'kubernetes_credentials',
-                        variable: 'KUBECONFIG'
-                    )
-                ]) {
-
-                    sh '''
-                        export KUBECONFIG="$KUBECONFIG"
-
-                        echo "======================================"
-                        echo "FINAL BLUE-GREEN STATUS"
-                        echo "======================================"
-
-                        echo "===== Deployments ====="
-
-                        kubectl get deployments
-
-                        echo "===== Pods ====="
 
                         kubectl get pods -o wide
 
-                        echo "===== Production Service ====="
+                        echo "======================================"
+                        echo "Service"
+                        echo "======================================"
 
-                        kubectl get service ${SERVICE_NAME}
+                        kubectl get service
+                    '''
+                }
+            }
+        }
 
-                        echo "===== Active Color ====="
+        stage('Verify Application Image') {
 
-                        kubectl get service ${SERVICE_NAME} \
-                          -o jsonpath='{.spec.selector.version}'
+            steps {
+
+                withCredentials([
+                    file(
+                        credentialsId: 'kubernetes_credentials',
+                        variable: 'KUBECONFIG'
+                    )
+                ]) {
+
+                    sh '''
+                        export KUBECONFIG="$KUBECONFIG"
+
+                        echo "======================================"
+                        echo "DEPLOYED IMAGE"
+                        echo "======================================"
+
+                        kubectl get deployment my-java-app \
+                          -o jsonpath='{.spec.template.spec.containers[0].image}'
+
                         echo
 
-                        echo "===== Active Image ====="
+                        echo "======================================"
+                        echo "READY REPLICAS"
+                        echo "======================================"
 
-                        kubectl get deployment \
-                          my-java-app-${NEW_COLOR} \
-                          -o jsonpath='{.spec.template.spec.containers[0].image}'
+                        kubectl get deployment my-java-app \
+                          -o jsonpath='{.status.readyReplicas}'
+
+                        echo
+
+                        echo "======================================"
+                        echo "AVAILABLE REPLICAS"
+                        echo "======================================"
+
+                        kubectl get deployment my-java-app \
+                          -o jsonpath='{.status.availableReplicas}'
+
                         echo
                     '''
                 }
@@ -473,22 +234,15 @@ pipeline {
         }
     }
 
-    /*
-     * -------------------------------------------------------------
-     * POST ACTIONS
-     * -------------------------------------------------------------
-     */
-
     post {
 
         success {
 
             echo "======================================"
-            echo "BLUE-GREEN DEPLOYMENT SUCCESSFUL"
+            echo "ROLLING UPDATE SUCCESSFUL"
             echo "======================================"
 
-            echo "Previous color : ${env.ACTIVE_COLOR}"
-            echo "Active color   : ${env.NEW_COLOR}"
+            echo "Helm Release : ${env.HELM_RELEASE}"
 
             echo "Image:"
             echo "${ECR_REGISTRY}/${ECR_REPO_NAME}:${BUILD_NUMBER}"
@@ -498,56 +252,58 @@ pipeline {
 
             echo "======================================"
             echo "DEPLOYMENT FAILED"
-            echo "STARTING AUTOMATIC ROLLBACK"
             echo "======================================"
 
             script {
 
-                if (env.ACTIVE_COLOR &&
-                    env.NEW_COLOR &&
-                    env.ACTIVE_COLOR != env.NEW_COLOR) {
+                withCredentials([
+                    file(
+                        credentialsId: 'kubernetes_credentials',
+                        variable: 'KUBECONFIG'
+                    )
+                ]) {
 
-                    withCredentials([
-                        file(
-                            credentialsId: 'kubernetes_credentials',
-                            variable: 'KUBECONFIG'
-                        )
-                    ]) {
+                    sh '''
+                        export KUBECONFIG="$KUBECONFIG"
 
-                        sh '''
-                            export KUBECONFIG="$KUBECONFIG"
+                        echo "======================================"
+                        echo "Helm History"
+                        echo "======================================"
 
-                            echo "Rolling production traffic back to:"
-                            echo "${ACTIVE_COLOR}"
+                        helm history ${HELM_RELEASE}
 
-                            if kubectl get service ${SERVICE_NAME} >/dev/null 2>&1
-                            then
+                        echo "======================================"
+                        echo "Current Deployment"
+                        echo "======================================"
 
-                                helm upgrade ${SERVICE_RELEASE} \
-                                  ${HELM_CHART} \
-                                  --set productionService.enabled=true \
-                                  --set productionService.color=${ACTIVE_COLOR} \
-                                  --wait \
-                                  --timeout 5m
+                        kubectl get deployment my-java-app \
+                          -o wide || true
 
-                                echo "======================================"
-                                echo "ROLLBACK COMPLETED"
-                                echo "======================================"
+                        echo "======================================"
+                        echo "Pod Status"
+                        echo "======================================"
 
-                                echo "Active color after rollback:"
+                        kubectl get pods -o wide || true
 
-                                kubectl get service ${SERVICE_NAME} \
-                                  -o jsonpath='{.spec.selector.version}'
+                        echo "======================================"
+                        echo "Recent Events"
+                        echo "======================================"
 
-                                echo
+                        kubectl get events \
+                          --sort-by=.lastTimestamp | tail -20 || true
 
-                            else
+                        echo "======================================"
+                        echo "Rolling Back Helm Release"
+                        echo "======================================"
 
-                                echo "Production Service does not exist."
-                                echo "Nothing to rollback."
-                            fi
-                        '''
-                    }
+                        helm rollback ${HELM_RELEASE} 0 \
+                          --wait \
+                          --timeout 5m || true
+
+                        echo "======================================"
+                        echo "Rollback Attempt Completed"
+                        echo "======================================"
+                    '''
                 }
             }
         }
