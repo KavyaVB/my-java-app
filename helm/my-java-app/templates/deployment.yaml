@@ -1,24 +1,58 @@
 apiVersion: apps/v1
 kind: Deployment
+
 metadata:
-  name: {{ include "my-java-app.fullname" . }}
+  name: {{ include "my-java-app.fullname" . }}-{{ .Values.color }}
+
   labels:
     {{- include "my-java-app.labels" . | nindent 4 }}
+    version: {{ .Values.color }}
+
 spec:
   replicas: {{ .Values.replicaCount }}
+
   selector:
     matchLabels:
-      {{- include "my-java-app.selectorLabels" . | nindent 6 }}
+      app: {{ include "my-java-app.name" . }}
+      version: {{ .Values.color }}
+
   template:
     metadata:
       labels:
-        {{- include "my-java-app.selectorLabels" . | nindent 8 }}
+        app: {{ include "my-java-app.name" . }}
+        version: {{ .Values.color }}
+
     spec:
       containers:
+
         - name: my-java-app
+
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+
           ports:
             - name: http
               containerPort: {{ .Values.service.targetPort }}
               protocol: TCP
+
+          readinessProbe:
+            tcpSocket:
+              port: {{ .Values.service.targetPort }}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+
+          livenessProbe:
+            tcpSocket:
+              port: {{ .Values.service.targetPort }}
+            initialDelaySeconds: 30
+            periodSeconds: 10
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
