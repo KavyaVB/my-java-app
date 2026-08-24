@@ -9,3 +9,7 @@ image:
 
 service:
   targetPort: 8080
+
+productionService:
+  enabled: false
+  color: blue

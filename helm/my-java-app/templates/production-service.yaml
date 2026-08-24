@@ -1,0 +1,22 @@
+{{- if .Values.productionService.enabled }}
+
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: my-java-app-service
+
+spec:
+  type: NodePort
+
+  selector:
+    app: my-java-app
+    version: {{ .Values.productionService.color }}
+
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+      nodePort: 30080
+
+{{- end }}
