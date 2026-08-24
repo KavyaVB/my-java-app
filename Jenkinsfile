@@ -277,14 +277,23 @@ pipeline {
                         echo "Checking ${NEW_COLOR} deployment"
                         echo "======================================"
 
+                        DEPLOYMENT_NAME=$(kubectl get deployment \
+                            -l app=my-java-app,version="${NEW_COLOR}" \
+                            -o jsonpath='{.items[0].metadata.name}')
+
+                        echo "Found Deployment: ${DEPLOYMENT_NAME}"
+
                         kubectl rollout status \
-                          deployment/my-java-app-${NEW_COLOR} \
-                          --timeout=5m
+                            deployment/"${DEPLOYMENT_NAME}" \
+                            --timeout=5m
 
                         echo "===== Deployment ====="
 
-                        kubectl get deployment \
-                          my-java-app-${NEW_COLOR}
+                        kubectl get deployment "${DEPLOYMENT_NAME}" -o wide
+
+                        echo "${NEW_COLOR} deployment verification completed"
+                        echo "======================================"
+
 
                         echo "===== Pods ====="
 
