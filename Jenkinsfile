@@ -14,11 +14,22 @@ pipeline {
     stages {
 
         stage('Checkout') {
-            steps {
-                git branch: 'main',
-                    url: 'https://github.com/KavyaVB/my-java-app.git'
-            }
-        }
+    steps {
+        git branch: 'main',
+            url: 'https://github.com/KavyaVB/my-java-app.git'
+
+        sh '''
+            echo "===== Workspace ====="
+            pwd
+
+            echo "===== Files ====="
+            ls -la
+
+            echo "===== Chart files ====="
+            find . -maxdepth 4 -name Chart.yaml -print
+        '''
+    }
+}
 
         stage('Build Java') {
             steps {
