@@ -8,7 +8,7 @@ pipeline {
         ECR_REGISTRY = 'public.ecr.aws/g1c4x6s2'
 
         // Your Helm chart is inside the my-java-app directory
-        HELM_CHART = './my-java-app'
+        HELM_CHART = './helm/my-java-app'
     }
 
     stages {
@@ -17,17 +17,6 @@ pipeline {
     steps {
         git branch: 'main',
             url: 'https://github.com/KavyaVB/my-java-app.git'
-
-        sh '''
-            echo "===== Workspace ====="
-            pwd
-
-            echo "===== Files ====="
-            ls -la
-
-            echo "===== Chart files ====="
-            find . -maxdepth 4 -name Chart.yaml -print
-        '''
     }
 }
 
