@@ -191,13 +191,13 @@ pipeline {
                             echo "Creating production Service..."
 
                             helm upgrade --install \
-                              ${SERVICE_RELEASE} \
-                              ${HELM_CHART} \
-                              --set productionService.enabled=true \
-                              --set productionService.color=${ACTIVE_COLOR} \
-                              --wait \
-                              --timeout 5m
-
+                                "${HELM_RELEASE}" \
+                                "${HELM_CHART}" \
+                                --set color="${ACTIVE_COLOR}" \
+                                --set productionService.enabled=true \
+                                --set productionService.color="${ACTIVE_COLOR}" \
+                                --wait \
+                                --timeout 5m
                             echo "Production Service created."
                         fi
 
