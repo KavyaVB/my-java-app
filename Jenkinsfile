@@ -278,10 +278,16 @@ pipeline {
                         echo "======================================"
 
                         DEPLOYMENT_NAME=$(kubectl get deployment \
-                            -l app=my-java-app,version="${NEW_COLOR}" \
-                            -o jsonpath='{.items[0].metadata.name}')
-
-                        echo "Found Deployment: ${DEPLOYMENT_NAME}"
+                            -l app.kubernetes.io/name=my-java-app,version="${NEW_COLOR}" \
+                            -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+                        
+                        if [ -z "$DEPLOYMENT_NAME" ]; then
+                            echo "ERROR: No ${NEW_COLOR} deployment found"
+                            kubectl get deployments --show-labels
+                            exit 1
+                        fi
+                        
+                        echo "Found deployment: ${DEPLOYMENT_NAME}"
 
                         kubectl rollout status \
                             deployment/"${DEPLOYMENT_NAME}" \
