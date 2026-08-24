@@ -2,57 +2,30 @@ apiVersion: apps/v1
 kind: Deployment
 
 metadata:
-  name: {{ include "my-java-app.fullname" . }}-{{ .Values.color }}
-
+  name: {{ include "my-java-app.fullname" . }}
   labels:
     {{- include "my-java-app.labels" . | nindent 4 }}
-    version: {{ .Values.color }}
 
 spec:
   replicas: {{ .Values.replicaCount }}
 
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+
   selector:
     matchLabels:
       app: {{ include "my-java-app.name" . }}
-      version: {{ .Values.color }}
 
   template:
     metadata:
       labels:
         app: {{ include "my-java-app.name" . }}
-        version: {{ .Values.color }}
 
     spec:
       containers:
-
         - name: my-java-app
-
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-
-          ports:
-            - name: http
-              containerPort: {{ .Values.service.targetPort }}
-              protocol: TCP
-
-          readinessProbe:
-            tcpSocket:
-              port: {{ .Values.service.targetPort }}
-            initialDelaySeconds: 10
-            periodSeconds: 5
-
-          livenessProbe:
-            tcpSocket:
-              port: {{ .Values.service.targetPort }}
-            initialDelaySeconds: 30
-            periodSeconds: 10
-
-          resources:
-            requests:
-              cpu: "100m"
-              memory: "128Mi"
-
-            limits:
-              cpu: "500m"
-              memory: "512Mi"

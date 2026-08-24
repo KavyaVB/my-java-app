@@ -1,7 +1,5 @@
 replicaCount: 2
 
-color: blue
-
 image:
   repository: public.ecr.aws/g1c4x6s2/my-java-app
   pullPolicy: Always
@@ -9,7 +7,3 @@ image:
 
 service:
   targetPort: 8080
-
-productionService:
-  enabled: false
-  color: blue
