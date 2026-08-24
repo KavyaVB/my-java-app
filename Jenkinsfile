@@ -278,7 +278,7 @@ pipeline {
                         echo "======================================"
 
                         kubectl rollout status \
-                          deployment/my-java-app-${NEW_COLOR} \
+                          deployment/my-java-app-${NEW_COLOR}-${NEW_COLOR} \
                           --timeout=5m
 
                         echo "===== Deployment ====="
