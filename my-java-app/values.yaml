@@ -1,0 +1,11 @@
+replicaCount: 2
+color: blue
+
+image:
+  repository: public.ecr.aws/g1c4x6s2/my-java-app
+  tag: latest
+
+service:
+  type: NodePort
+  port: 8080
+  targetPort: 8080
